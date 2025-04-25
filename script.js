@@ -114,12 +114,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
 
-                    // 设置画布尺寸
-                    canvas.width = img.width;
-                    canvas.height = img.height;
+                    // 智能调整尺寸 - 如果图片过大，适当缩小
+                    let { width, height } = calculateOptimalSize(img.width, img.height);
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // 提高图片质量
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
 
                     // 绘制图片
-                    ctx.drawImage(img, 0, 0);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 根据文件类型选择压缩格式
+                    let mimeType = file.type;
+                    if (file.type === 'image/png' && quality < 0.9) {
+                        // PNG转为JPEG以获得更好的压缩效果
+                        mimeType = 'image/jpeg';
+                    }
 
                     // 压缩
                     canvas.toBlob(function(blob) {
@@ -130,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         compressedFiles.push({
                             original: file,
                             compressed: blob,
-                            name: file.name
+                            name: getCompressedFileName(file.name, mimeType)
                         });
 
                         if (processedCount === selectedFiles.length) {
@@ -139,12 +152,43 @@ document.addEventListener('DOMContentLoaded', function() {
                             compressBtn.disabled = false;
                             resultArea.style.display = 'block';
                         }
-                    }, file.type, quality);
+                    }, mimeType, quality);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         });
+    }
+
+    function calculateOptimalSize(originalWidth, originalHeight) {
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        const MAX_PIXELS = MAX_WIDTH * MAX_HEIGHT;
+
+        // 如果图片不是很大，保持原尺寸
+        if (originalWidth <= MAX_WIDTH && originalHeight <= MAX_HEIGHT) {
+            return { width: originalWidth, height: originalHeight };
+        }
+
+        // 计算缩放比例
+        const ratio = Math.min(
+            MAX_WIDTH / originalWidth,
+            MAX_HEIGHT / originalHeight,
+            Math.sqrt(MAX_PIXELS / (originalWidth * originalHeight))
+        );
+
+        return {
+            width: Math.round(originalWidth * ratio),
+            height: Math.round(originalHeight * ratio)
+        };
+    }
+
+    function getCompressedFileName(originalName, mimeType) {
+        const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
+        const ext = mimeType === 'image/jpeg' ? '.jpg' :
+                   mimeType === 'image/png' ? '.png' :
+                   mimeType === 'image/webp' ? '.webp' : '.jpg';
+        return nameWithoutExt + '_compressed' + ext;
     }
 
     function createComparisonItem(originalFile, compressedBlob, img) {
