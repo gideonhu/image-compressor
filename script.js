@@ -83,17 +83,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // 压缩按钮点击
     compressBtn.addEventListener('click', function() {
         if (selectedFiles.length === 0) {
-            alert('请先选择图片文件');
+            showError('请先选择图片文件');
             return;
         }
 
         compressBtn.textContent = '压缩中...';
         compressBtn.disabled = true;
 
+        // 显示处理进度
+        showProcessingStatus();
+
         setTimeout(() => {
             compressImages();
         }, 100);
     });
+
+    function showError(message) {
+        const controls = document.getElementById('controls');
+        let errorDiv = controls.querySelector('.error-message');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            controls.appendChild(errorDiv);
+        }
+        errorDiv.textContent = message;
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.parentNode.removeChild(errorDiv);
+            }
+        }, 3000);
+    }
+
+    function showProcessingStatus() {
+        const controls = document.getElementById('controls');
+
+        // 添加进度条
+        if (!controls.querySelector('.progress-bar')) {
+            const progressHTML = `
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="file-list" id="fileList"></div>
+            `;
+            controls.insertAdjacentHTML('beforeend', progressHTML);
+        }
+
+        // 显示文件列表
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <span>${file.name}</span>
+                <span class="status processing" id="status-${index}">等待中...</span>
+            `;
+            fileList.appendChild(fileItem);
+        });
+    }
 
     function compressImages() {
         const quality = qualitySlider.value / 100;
@@ -138,6 +185,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     canvas.toBlob(function(blob) {
                         processedCount++;
 
+                        // 更新进度
+                        updateProgress(index, processedCount);
+
                         // 创建对比显示
                         createComparisonItem(file, blob, img);
                         compressedFiles.push({
@@ -151,6 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             compressBtn.textContent = '开始压缩';
                             compressBtn.disabled = false;
                             resultArea.style.display = 'block';
+                            hideProgressBar();
                         }
                     }, mimeType, quality);
                 };
@@ -275,5 +326,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function updateProgress(fileIndex, completedCount) {
+        // 更新进度条
+        const progressFill = document.getElementById('progressFill');
+        if (progressFill) {
+            const percentage = (completedCount / selectedFiles.length) * 100;
+            progressFill.style.width = percentage + '%';
+        }
+
+        // 更新文件状态
+        const statusElement = document.getElementById(`status-${fileIndex}`);
+        if (statusElement) {
+            statusElement.textContent = '已完成';
+            statusElement.className = 'status completed';
+        }
+    }
+
+    function hideProgressBar() {
+        const progressBar = document.querySelector('.progress-bar');
+        const fileList = document.querySelector('.file-list');
+        if (progressBar) progressBar.style.display = 'none';
+        if (fileList) fileList.style.display = 'none';
     }
 });
